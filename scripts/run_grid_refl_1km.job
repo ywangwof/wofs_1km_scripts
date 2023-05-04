@@ -1,0 +1,23 @@
+#!/bin/csh 
+#======================================================
+#SBATCH -J GRIDS_REFL
+#SBATCH -o gridrefl.o%j
+#SBATCH -e gridrefl.err
+#SBATCH -n 1
+#SBATCH -t 0:10:00 
+#SBATCH -p batch
+#======================================================
+
+echo "BEGIN GRIDS_REFL"
+date
+
+sleep 1
+
+srun --mpi=pmi2 grid_refl_obs_gsi.exe dbzobs.nc 35 20 wrfinput_d02.ensmean  > grid_refl.output
+
+echo "END GRIDS_REFL"
+
+touch refl_done
+
+date
+exit 0

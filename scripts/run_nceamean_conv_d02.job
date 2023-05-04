@@ -1,0 +1,25 @@
+#!/bin/csh 
+#======================================================
+#SBATCH -J NCEA_MEAN_WRFOUT2
+#SBATCH -o nceamean01_sm.o%j
+#SBATCH -e nceamean01_sm.err
+#SBATCH -p batch
+#SBATCH -n 1
+#SBATCH -t 0:15:00 
+#======================================================
+
+echo "BEGIN NCEA_MEAN"
+date
+
+cp -pvf wrfinput_d02.1 wrfinput_d02.ensmean
+foreach var ( MU REFL_10CM )
+     set tensout = temp_${var}_mean
+     srun --mpi=pmi2 /scratch/software/miniconda3/bin/ncea -v ${var} wrfinput_d02*    ${tensout}
+     srun --mpi=pmi2 /scratch/software/miniconda3/bin/ncks -A temp_${var}_mean wrfinput_d02.ensmean
+end
+
+rm -rf temp_*
+echo "END ENS_MEAN"
+touch ensmean_done01
+date
+exit 0

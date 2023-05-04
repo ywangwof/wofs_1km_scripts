@@ -1,0 +1,32 @@
+#!/bin/csh                                                                                                                                 
+#==================================================================
+#SBATCH --job-name=obs_mask
+#SBATCH --output=variance_output.log
+#SBATCH -e variance.err
+#SBATCH -A smallqueue
+#SBATCH -p workq
+#SBATCH --ntasks-per-node=1
+#SBATCH --cpus-per-task=24
+#SBATCH --time 1:00:00
+#==================================================================
+#                                                                                                                                          
+#                                                                                                                                          
+source ~/scripts/WOFenv_rto
+source ${TOP_DIR}/retro.cfg.${event}
+
+set echo
+#${COPY} ${TEMPLATE_DIR}/input.nml.others input.nml
+#./obs_sequence_tool
+
+${COPY} ${TEMPLATE_DIR}/input.nml.rvel input.nml
+#./obs_sequence_tool
+./obs_seq_to_netcdf
+#${MOVE} obs_seq_rvel.out obs_seq_3km.out
+${MOVE} obs_epoch_001.nc obs_epoch_3km.nc
+
+mpirun python find_variance_zones.py
+
+${COPY} ${TEMPLATE_DIR}/input.nml.merge input.nml
+./obs_sequence_tool
+
+touch mask_done

@@ -1,0 +1,7 @@
+setenv event 20220429
+
+setenv SCRIPTDIR  /scratch/wofs_1km/wofs_1km_scripts
+setenv CENTRALDIR  /scratch/wofs_1km
+setenv RUNDIR /scratch/wofs_1km/D02/${event}
+setenv TOP_DIR  /scratch/wofs_1km/D02
+
