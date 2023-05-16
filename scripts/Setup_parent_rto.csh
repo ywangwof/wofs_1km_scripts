@@ -1,32 +1,48 @@
-#!/bin/csh 
+#!/bin/csh
 
-### Setup directories and link associated stuff to get WoFS started. 
+### Setup directories and link associated stuff to get WoFS started.
 ### Run this script BEFORE anything else kicks off.
 
-set echo
-source /scratch/wofs_1km/wofs_1km_scripts/WOFenv_rto_d01
+set scrptdir=$0:h
+set scrptdir=`realpath ${scrptdir}`
+set parentdir=${scrptdir:h}
+
+if ($#argv == 1 ) then
+    set realconfig = $argv[1]
+else
+    set realconfig = ${parentdir}/WOFenv_rto_d01
+endif
+
+source ${realconfig}
+
+set eventstr = `date -d "$event" +%Y-%m-%d`
+set eventyr = `date -d "$event" +%Y`
+set eventmn = `date -d "$event" +%m`
+set eventdy = `date -d "$event" +%d`
+set eventnxt = `date -d "$event 1 days" +%Y%m%d`
+set eventnxstr = `date -d "$eventnxt" +%Y-%m-%d`
+set eventnxyr = `date -d "$eventnxt" +%Y`
+set eventnxmn = `date -d "$eventnxt" +%m`
+set eventnxdy = `date -d "$eventnxt" +%d`
+
+
+#set echo
 source ${CENTRALDIR}/radar_files/radars.${event}.csh
 
-echo "setenv sdate "2022-04-29_15:00:00 >> ${TOP_DIR}/retro.cfg.${event}
-echo "setenv edate "2022-04-30_07:00:00 >> ${TOP_DIR}/retro.cfg.${event}
-#echo "setenv soildate "2020-05-04_15:00:00 >> ${TOP_DIR}/retro.cfg.${event}                                                   
-#echo "setenv sstdate "2020-05-05_12:00:00 >> ${TOP_DIR}/retro.cfg.${event}                                                    
-#echo "setenv sstymd "20200504 >> ${TOP_DIR}/retro.cfg.${event}                                                                
-#echo "setenv sstyr "2020 >> ${TOP_DIR}/retro.cfg.${event}                                                                     
-#echo "setenv sstmon "05 >> ${TOP_DIR}/retro.cfg.${event}                                                                      
-#echo "setenv sstday "04 >> ${TOP_DIR}/retro.cfg.${event}                                                                      
+echo "setenv sdate ${eventstr}_15:00:00" >> ${TOP_DIR}/retro.cfg.${event}
+echo "setenv edate ${eventnxstr}_07:00:00" >> ${TOP_DIR}/retro.cfg.${event}
 
-### Set running days variables                                                                                                 
-echo "setenv runyr "2022 >> ${TOP_DIR}/retro.cfg.${event}
-echo "setenv runmon "04 >> ${TOP_DIR}/retro.cfg.${event}
-echo "setenv runday "29 >> ${TOP_DIR}/retro.cfg.${event}
-echo "setenv nxtyr "2022 >> ${TOP_DIR}/retro.cfg.${event}
-echo "setenv nxtmon "04 >> ${TOP_DIR}/retro.cfg.${event}
-echo "setenv nxtday "30 >> ${TOP_DIR}/retro.cfg.${event}
-echo "setenv runDay "20220429 >> ${TOP_DIR}/retro.cfg.${event}
-echo "setenv nxtDay "20220430 >> ${TOP_DIR}/retro.cfg.${event}
+### Set running days variables
+echo "setenv runyr $eventyr" >> ${TOP_DIR}/retro.cfg.${event}
+echo "setenv runmon $eventmn" >> ${TOP_DIR}/retro.cfg.${event}
+echo "setenv runday $eventdy" >> ${TOP_DIR}/retro.cfg.${event}
+echo "setenv nxtyr $eventnxyr" >> ${TOP_DIR}/retro.cfg.${event}
+echo "setenv nxtmon $eventnxmn" >> ${TOP_DIR}/retro.cfg.${event}
+echo "setenv nxtday $eventnxdy" >> ${TOP_DIR}/retro.cfg.${event}
+echo "setenv runDay $event" >> ${TOP_DIR}/retro.cfg.${event}
+echo "setenv nxtDay $eventnxt" >> ${TOP_DIR}/retro.cfg.${event}
 
-### NCYCLE_* is number of particular analysis cycles                                                                                                                                               
+### NCYCLE_* is number of particular analysis cycles
 echo "setenv NCYCLE_1H 36" >> ${TOP_DIR}/retro.cfg.${event}
 
 ### Set start cycle and cycling period
@@ -183,7 +199,7 @@ echo "setenv   COPY '/bin/cp -p'" >> ${TOP_DIR}/retro.cfg.${event}
 echo "setenv   MOVE '/bin/mv'" >> ${TOP_DIR}/retro.cfg.${event}
 echo "setenv   LINK 'ln -fs'" >> ${TOP_DIR}/retro.cfg.${event}
 echo "setenv   WGET /usr/bin/wget" >> ${TOP_DIR}/retro.cfg.${event}
-   
+
 ### Logfiles
 echo "setenv logWPSBCs "${RUNDIR}"/WPSBCs.log" >> ${TOP_DIR}/retro.cfg.${event}
 echo "setenv logWPSICs "${RUNDIR}"/WPSICs.log" >> ${TOP_DIR}/retro.cfg.${event}
@@ -191,14 +207,14 @@ echo "setenv logWPSIND "${RUNDIR}"/WPSIND.log" >> ${TOP_DIR}/retro.cfg.${event}
 echo "setenv logREALBCs "${RUNDIR}"/BCs.log" >> ${TOP_DIR}/retro.cfg.${event}
 echo "setenv logREALICs "${RUNDIR}"/ICs.log" >> ${TOP_DIR}/retro.cfg.${event}
 echo "setenv logIcbcIND "${RUNDIR}"/ICBCIND.log" >> ${TOP_DIR}/retro.cfg.${event}
-echo "setenv logConv "${RUNDIR}"/ConvMAIN.log" >> ${TOP_DIR}/retro.cfg.${event} 
-    
+echo "setenv logConv "${RUNDIR}"/ConvMAIN.log" >> ${TOP_DIR}/retro.cfg.${event}
+
 source ${TOP_DIR}/retro.cfg.${event}
 
 mkdir $RUNDIR
 cd $RUNDIR
-mkdir -p ${RUNDIR}/flags 
-   
+mkdir -p ${RUNDIR}/flags
+
 if ( $start_hr == 12 ) then
    set cycles = ( 12 13 14 15 16 17 18 19 20 21 22 23 )
 endif
@@ -220,7 +236,7 @@ if ( $start_hr == 21 ) then
 endif
 
 foreach hr ( $cycles )
-    
+
    foreach mte ( 00 15 30 45 )
 
      mkdir -p ${RUNDIR}/${runDay}${hr}${mte}
@@ -233,11 +249,11 @@ foreach hr2 ( 00 01 02 03 04 05 )
 #foreach hr2 ( 00 01 02 )
 
    foreach mte ( 00 15 30 45 )
-     
+
       mkdir -p ${RUNDIR}/${nxtDay}${hr2}${mte}
 
    end
-    
+
 end
 
 mkdir -p ${RUNDIR}/${nxtDay}0600
@@ -249,14 +265,14 @@ mkdir -p ${FCST_DIR}
 #mkdir -p ${FCST_DIR}/HIRES
 
 cd ${RUNDIR}
-    
+
 ###########################################################################
 
 cp -R ${DARTDIR}/models/wrf/work/advance_time .
 cp -R ${DARTDIR}/models/wrf/work/convertdate .
 cp -R ${DARTDIR}/models/wrf/work/update_wrf_bc .
 
-cp -R ${TEMPLATE_DIR}/input.nml.conv1 ./input.nml 
+cp -R ${TEMPLATE_DIR}/input.nml.conv1 ./input.nml
 cp -R ${TEMPLATE_DIR}/namelists.WOFS/namelist.input.member1 namelist.input
 
 ###########################################################################

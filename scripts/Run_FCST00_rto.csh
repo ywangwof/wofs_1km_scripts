@@ -1,13 +1,33 @@
-#!/bin/csh 
+#!/bin/csh
 #-----------------------------------------------------------------------
 # Script to Run WoFS Forecasts at :00 past the hour
 #-----------------------------------------------------------------------
 
-source /scratch/wofs_1km/wofs_1km_scripts/WOFenv_rto_d01
+set scrptdir=$0:h
+set scrptdir=`realpath ${scrptdir}`
+set parentdir=${scrptdir:h}
+
+if ($#argv >= 1 ) then
+    set realconfig = $argv[1]
+else
+    set realconfig = ${parentdir}/WOFenv_rto_d01
+endif
+
+if ($#argv == 2 ) then
+    if ($argv[2] =~ [0-9][0-9][0-9][0-9]) then
+        set starttime = $argv[2]
+    else
+        echo "ERROR: unsupported argument: $argv[2]"
+        exit
+    endif
+endif
+
+source ${realconfig}
+
 set ENVFILE = ${TOP_DIR}/retro.cfg.${event}
 source $ENVFILE
 source ${CENTRALDIR}/radar_files/radars.${event}.csh
-set echo
+#set echo
 
 setenv pcp 5
 
@@ -31,14 +51,31 @@ if ( $cycle_start == "21" ) then
    set times = (2300 0000 0100 0200 0300 0400 0500 0600)
 endif
 
+set indx = 0
+if ($?starttime) then
+    foreach tm ($times)
+        @ indx += 1
+        if ($tm == $starttime) then
+            break
+        endif
+    end
+    #echo $indx, ${times[$indx]}
+endif
+
+set fcst_times = ()
+while ($indx <= $#times)
+    set fcst_times = ($fcst_times $times[$indx])
+    @ indx += 1
+end
+
 ########## LOOP THROUGH FORECAST START TIMES
-foreach btime ( ${times} )
+foreach btime ( ${fcst_times} )
 
 #if ( $btime == "2000" ) then
 #   while ( ! -e ${SEMA4}/HRRRE_12BCsP2_ready)
 #         sleep 60
 #   end
-#endif 
+#endif
 
 set hhh  = `echo $btime | cut -c1`
 set mmm  = `echo $btime | cut -c3`
@@ -72,7 +109,7 @@ cp ${RUNDIR}/input.nml ./input.nml
 set fcst_cut = `echo $fcst_start | cut -c1-10`
 
 set START_YEAR  = `echo $fcst_start | cut -c1-4`
-set START_MONTH = `echo $fcst_start | cut -c5-6` 
+set START_MONTH = `echo $fcst_start | cut -c5-6`
 set START_DAY   = `echo $fcst_start | cut -c7-8`
 set START_HOUR  = `echo $fcst_start | cut -c9-10`
 set START_MIN   = `echo $fcst_start | cut -c11-12`
@@ -113,9 +150,9 @@ while($member <= ${FCST_SIZE})
        mkdir ENS_MEM_${member}
        cd ENS_MEM_${member}/
     endif
-     
+
     if ( -e namelist.input) ${REMOVE} namelist.input
-    ${REMOVE} rsl.* fcstModel.sed 
+    ${REMOVE} rsl.* fcstModel.sed
 
     cat >! fcstModel.sed << EOF
          /run_minutes/c\
@@ -147,7 +184,7 @@ while($member <= ${FCST_SIZE})
          /fine_input_stream/c\
          fine_input_stream          = 2*0,
          /history_interval/c\
-         history_interval           = 2*${hst}, 
+         history_interval           = 2*${hst},
          /frames_per_outfile/c\
          frames_per_outfile         = 2*1,
          /reset_interval1/c\
@@ -204,9 +241,9 @@ sleep 1
    echo "#=================================================================="  >> ${FCSTHR_DIR}/WoFS_FCST.job
    echo '#SBATCH' "-J wofs_fcst$btime"                                         >> ${FCSTHR_DIR}/WoFS_FCST.job
    echo '#SBATCH' "-o ${FCSTHR_DIR}/wofs_fcst\%a.log"                          >> ${FCSTHR_DIR}/WoFS_FCST.job
-   echo '#SBATCH' "-e ${FCSTHR_DIR}/wofs_fcst\%a.err"                          >> ${FCSTHR_DIR}/WoFS_FCST.job 
+   echo '#SBATCH' "-e ${FCSTHR_DIR}/wofs_fcst\%a.err"                          >> ${FCSTHR_DIR}/WoFS_FCST.job
    echo '#SBATCH' "-p batch"                                              >> ${FCSTHR_DIR}/WoFS_FCST.job
-   echo '#SBATCH' "--mem-per-cpu=5G"                                       >> ${FCSTHR_DIR}/WoFS_FCST.job 
+   echo '#SBATCH' "--mem-per-cpu=5G"                                       >> ${FCSTHR_DIR}/WoFS_FCST.job
    echo '#SBATCH' "-n ${WRF_FCORES}"                                           >> ${FCSTHR_DIR}/WoFS_FCST.job
    echo '#SBATCH -t 2:00:00'                                                   >> ${FCSTHR_DIR}/WoFS_FCST.job
    echo "#=================================================================="  >> ${FCSTHR_DIR}/WoFS_FCST.job
@@ -230,7 +267,7 @@ sleep 1
    ${COPY} ${RUNDIR}/mem\${SLURM_ARRAY_TASK_ID}/wrfbdy_d01.\${SLURM_ARRAY_TASK_ID} ./wrfbdy_d01
    ${COPY} ${RUNDIR}/${fcst_start}/wrfinput_d01.\${SLURM_ARRAY_TASK_ID} ./wrfinput_d01
    ${COPY} ${CENTRALDIR}/D02/${event}/${fcst_start}/wrfinput_d02.\${SLURM_ARRAY_TASK_ID} ./wrfinput_d02
-   #${COPY} ${RUNDIR}/ic\${SLURM_ARRAY_TASK_ID}/wrfinput_d01_ic ./wrfinput_d01 
+   #${COPY} ${RUNDIR}/ic\${SLURM_ARRAY_TASK_ID}/wrfinput_d01_ic ./wrfinput_d01
    ${COPY} ${TEMPLATE_DIR}/forecast_vars_d01.txt ./
    ${COPY} ${TEMPLATE_DIR}/forecast_vars_d02.txt ./
 

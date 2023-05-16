@@ -1,4 +1,4 @@
-#!/bin/csh 
+#!/bin/csh
 ########################################################################
 #
 #	RUN WoFS SYSTEM
@@ -7,14 +7,36 @@
 #
 ########################################################################
 
-source /scratch/wofs_1km/wofs_1km_scripts/WOFenv_rto_d01
+set scrptdir=$0:h
+set scrptdir=`realpath ${scrptdir}`
+set parentdir=${scrptdir:h}
+
+if ($#argv == 1 ) then
+    set realconfig = $argv[1]
+else
+    set realconfig = ${parentdir}/WOFenv_rto_d01
+endif
+
+source ${realconfig}
+set execdir = ${SCRIPTDIR:h}/exec
+
 set ENVFILE = ${TOP_DIR}/retro.cfg.${event}
 source ${ENVFILE}
 
-set echo
+#set echo
 set startdate = ${event}${cycle_start}00
 #set datea = ${event}${cycle_start}00
-set datea = ${event}1500
+if ($#argv == 2 ) then
+    if ($argv[2] =~ [0-9][0-9][0-9][0-9]) then
+        set starttime = ${argv[2]}
+    else
+        echo "ERROR: unsupported argument: $argv[2]"
+        exit 0
+    endif
+else
+    set starttime = 1500
+endif
+set datea = ${event}${starttime}
 set datef = ${nxtDay}0300
 
 cd ${RUNDIR}
@@ -35,7 +57,7 @@ endif
 ## main loop over data assimilation cycles
 
 while (1 == 1)
-  
+
   set reflyes = 0
   set vryes = 0
   set cwpyes = 0
@@ -45,22 +67,22 @@ while (1 == 1)
   set aeriyes = 0
   set dlyes = 0
   set amvyes = 0
-  
+
   #set up some time strings
-  #set datep  =  `echo  ${datea} -${cycleinterval}m | ${RUNDIR}/advance_time` 
+  #set datep  =  `echo  ${datea} -${cycleinterval}m | ${RUNDIR}/advance_time`
   #echo $datep
   set daten  =  `echo  ${datea} ${cycleinterval}m | ${RUNDIR}/advance_time`
   echo $daten
 
   set thisstart = ${datea}
   set thisend = ${daten}
- 
+
   set startyear  = `echo ${thisstart} | cut -c1-4`
   set startmonth = `echo ${thisstart} | cut -c5-6`
   set startday   = `echo ${thisstart} | cut -c7-8`
   set starthour  = `echo ${thisstart} | cut -c9-10`
-  set startmin   = `echo ${thisstart} | cut -c11-12` 
- 
+  set startmin   = `echo ${thisstart} | cut -c11-12`
+
   set endyear  = `echo ${thisend} | cut -c1-4`
   set endmonth = `echo ${thisend} | cut -c5-6`
   set endday   = `echo ${thisend} | cut -c7-8`
@@ -87,9 +109,9 @@ while (1 == 1)
         ${COPY} ${RUNDIR}/ic${imem}/wrfinput_d01_ic ${ENKFDIR}/wrfinput_d01.${imem}
         @ imem++
     end
- 
+
     cd ${ENKFDIR}
-     
+
     # CALCULATE ENSEMBLE MEAN REFLECTIVITY FOR ADD NOISE (and for EnKF use)
     ${COPY} ${SCRIPTDIR}/run_nceamean_conv_d01.job .
     sbatch run_nceamean_conv_d01.job
@@ -201,7 +223,7 @@ EOF
 
      srun --mpi=pmi2 ${RUNDIR}/GSI_RUN/init_inf
 
-     touch init_inf_done   
+     touch init_inf_done
      exit 0
 EOF
 
@@ -224,7 +246,7 @@ EOF
    ${COPY} ${ENKFDIR}/prior_inf_d${DOMAIN}.1 ${RUNDIR}/${thisstart}/initial_prior_inf_d${DOMAIN}.1
    ${COPY} ${ENKFDIR}/prior_inf_sd_d${DOMAIN}.1 ${RUNDIR}/${thisstart}/initial_prior_inf_sd_d${DOMAIN}.1
 
-   ### START PRIOR INFLATION 
+   ### START PRIOR INFLATION
    cd ${ENKFDIR}
    echo "running prior inflation"
      echo "#\!/bin/csh"                                                          >! ${ENKFDIR}/runpriorinf.job
@@ -252,7 +274,7 @@ EOF
 
      srun --mpi=pmi2 ${RUNDIR}/GSI_RUN/prior_inf
 
-   touch prior_inf_done   
+   touch prior_inf_done
    exit 0
 EOF
 
@@ -284,8 +306,8 @@ EOF
 
 ######################### RUN GSI.exe ###########################
 
-    # WAIT UNTIL 8 MINUTES AFTER ANALYSIS TIME FOR OBSERVATION FILES                                                                                                                          
-#    setenv waitinterval 11  
+    # WAIT UNTIL 8 MINUTES AFTER ANALYSIS TIME FOR OBSERVATION FILES
+#    setenv waitinterval 11
 #    set datew  =  `echo  ${datea} ${waitinterval}m | ${RUNDIR}/advance_time`
 #    set today  =  `date -u +%Y%m%d%H%M`
 #    while ( ${today} < ${datew} )
@@ -294,17 +316,17 @@ EOF
 #     set today  =  `date -u +%Y%m%d%H%M`
 #    end
 
-    # CREATE ENV VARIABLES FOR OBSERVATION TIMES 
+    # CREATE ENV VARIABLES FOR OBSERVATION TIMES
     set yyyymmdd = `echo $thisstart | cut -c1-8`
     set hhmm = `echo $thisstart | cut -c9-12`
 
     # SEARCH FOR REFLECTIVITY OBSERVATIONS and RUN GRID REFL OBS
-    if ( -e ${REF_DIR}/${yyyymmdd}/obs_seq_RF_${yyyymmdd}_${hhmm}.nc ) then 
+    if ( -e ${REF_DIR}/${yyyymmdd}/obs_seq_RF_${yyyymmdd}_${hhmm}.nc ) then
        /bin/cp -pv ${REF_DIR}/${yyyymmdd}/obs_seq_RF_${yyyymmdd}_${hhmm}.nc ${ENKFDIR}/dbzobs.nc
 #       python ${ENKFDIR}/dbz_boundary.py
-       set reflyes = 1 
+       set reflyes = 1
        ${COPY} ${ADDNOISEDIR}/grid_refl_obs_gsi.exe ./
-       ${COPY} ${SCRIPTDIR}/run_grid_refl.job ./ 
+       ${COPY} ${SCRIPTDIR}/run_grid_refl.job ./
        if ( -e ${ENKFDIR}/grid_refl_obs_gsi.exe ) then##
 	  echo "ADDITIVE NOISE APPLIED"
 ##           RUN NCL SCRIPT TO EXTRACT WHERE ADD-NOISE IS TO BE APPLIED#
@@ -319,10 +341,10 @@ EOF
    endif
 
    # SEARCH FOR RADIAL VELOCITY OBSERVATIONS
-   if ( -e ${VEL_DIR}/${yyyymmdd}/obs_seq_VR_${yyyymmdd}_${hhmm}.nc ) then 
+   if ( -e ${VEL_DIR}/${yyyymmdd}/obs_seq_VR_${yyyymmdd}_${hhmm}.nc ) then
       /bin/cp -pv ${VEL_DIR}/${yyyymmdd}/obs_seq_VR_${yyyymmdd}_${hhmm}.nc ${ENKFDIR}/vrobs.nc
 #      python ${ENKFDIR}/vr_boundary.py
-      #${COPY} ${SCRIPTDIR}/vr_masking.job ${ENKFDIR} 
+      #${COPY} ${SCRIPTDIR}/vr_masking.job ${ENKFDIR}
       #/bin/cp -pv ${ENKFDIR}/vrobs.nc ${ENKFDIR}/vrobs_orig_${thisstart}.nc
       #sbatch vr_masking.job
       #while ( ! -e mask_done )
@@ -330,7 +352,7 @@ EOF
       #   sleep 2
       #end
       #${REMOVE} mask_done
-      #${MOVE} ${ENKFDIR}/obs_mask_boxes.nc ${ENKFDIR}/mask_zones_${thisstart}.nc 
+      #${MOVE} ${ENKFDIR}/obs_mask_boxes.nc ${ENKFDIR}/mask_zones_${thisstart}.nc
       set vryes = 1
    endif
 
@@ -339,7 +361,7 @@ EOF
       /bin/cp -pv  ${SAT_DIR}/CWP/${startyear}/${thisstart}_GOES${GOESV}_CWP_OBS.nc ${ENKFDIR}/cwpobs.nc
       set cwpyes = 1
    endif
-  
+
    # AMVs DATA from GOES-16   ----  Swapan Mallick
    # SEARCH FOR AMVs FILES
    #if ( -e ${SAT_DIR}/AMV/${startyear}/${thisstart}_GOES${GOESV}AMV.nc ) then
@@ -360,7 +382,7 @@ EOF
    endif
 
    # BUFR DATA
-   # BUFR DATA                                                                                                                                                           
+   # BUFR DATA
     if ( ${startmin} == 15 ) then
        if ( -e ${OBSDIR}/EBUFR/${startyear}/${startmonth}/${startday}/rap.${startyear}${startmonth}${startday}${starthour}.prepbufr.tm00 ) then
           set pbufrfile = ${OBSDIR}/EBUFR/${startyear}/${startmonth}/${startday}/rap.${startyear}${startmonth}${startday}${starthour}.prepbufr.tm00
@@ -373,25 +395,25 @@ EOF
           set  bufryes = 1
           echo "BUFR DATA ASSIMILATED"
        endif
-    endif   
+    endif
 #       else if ( -e ${OBSDIR}/RBUFR/${startyear}/${startmonth}/${startday}/rtma.${startyear}${startmonth}${startday}${starthour}00.prepbufr.tm00 ) then
 #          set pbufrfile = ${OBSDIR}/RBUFR/${startyear}/${startmonth}/${startday}/rtma.${startyear}${startmonth}${startday}${starthour}00.prepbufr.tm00
 #          /bin/cp -pv ${pbufrfile} ${ENKFDIR}/prepbufr
 #          set  bufryes = 1
-#          echo "BUFR DATA ASSIMILATED" 
-#       endif 
-    
+#          echo "BUFR DATA ASSIMILATED"
+#       endif
+
     endif
-    
+
     # AERI And DWL from SGP ARM site
-    #set dlbufrfile = ${SGP_DIR}/DLBUFR/dl_${thisstart}.dlbufr 
+    #set dlbufrfile = ${SGP_DIR}/DLBUFR/dl_${thisstart}.dlbufr
     #if ( -e ${dlbufrfile} ) then
 	    #     /bin/cp -pv ${dlbufrfile} ${ENKFDIR}/dlbufr
 	    #set  dlyes = 1
 	    #echo "DWL BUFR DATA ASSIMILATED"
     #endif
 
-    #set aeribufrfile = ${SGP_DIR}/AERIBUFR/aeri_${thisstart}.aeribufr 
+    #set aeribufrfile = ${SGP_DIR}/AERIBUFR/aeri_${thisstart}.aeribufr
     #if ( -e ${aeribufrfile} ) then
 	    #     /bin/cp -pv ${aeribufrfile} ${ENKFDIR}/aeribufr
 	    #set  aeriyes = 1
@@ -430,25 +452,25 @@ EOF
   if ( ${goesyes} == 1) echo "    goes.nc         abi          g16         abi_g16   0.0      0       0         0.125" >> ${ENKFDIR}/gsiparm.anl.obs
   if ( ${amvyes} == 1) echo  "    goes_amv.nc     uv           null        uv        1.0      0       0         0.35" >> ${ENKFDIR}/gsiparm.anl.obs
 
-${REMOVE} advModel.sed 
+${REMOVE} advModel.sed
 cat >! advModel.sed << EOF
   /NLAT=xxx,NLON=yyy,nsig=zzz,/c\
   JCAP=62,JCAP_B=62,NLAT=${NLATS},NLON=${NLONS},nsig=${NLEVS},
 EOF
 
-# The EOF on the line above MUST REMAIN in column 1.   
+# The EOF on the line above MUST REMAIN in column 1.
    sed -f advModel.sed ${TEMPLATE_DIR}/gsiparm.anl.template.head36 >! ${ENKFDIR}/gsiparm.anl.head
 
   # ADD obs portion to rest of template gsi parm file
   cat ${ENKFDIR}/gsiparm.anl.head ${ENKFDIR}/gsiparm.anl.obs ${TEMPLATE_DIR}/gsiparm.anl.template.tail36 > ${ENKFDIR}/gsiparm.anl
 ${REMOVE} advModel.sed gsiparm.anl.head
- 
+
    ################### SET UP GSI-BATCH JOB   #########################
    echo "#\!/bin/csh"                                                          >! ${ENKFDIR}/run_gsi_mem.job
    echo "#=================================================================="  >> ${ENKFDIR}/run_gsi_mem.job
    echo '#SBATCH' "-J run_gsi_mem"                                             >> ${ENKFDIR}/run_gsi_mem.job
    echo '#SBATCH' "-o ${ENKFDIR}/run_gsi\%a.log"                               >> ${ENKFDIR}/run_gsi_mem.job
-   echo '#SBATCH' "-e ${ENKFDIR}/run_gsi\%a.err"                               >> ${ENKFDIR}/run_gsi_mem.job 
+   echo '#SBATCH' "-e ${ENKFDIR}/run_gsi\%a.err"                               >> ${ENKFDIR}/run_gsi_mem.job
    echo '#SBATCH' "-p batch"                                                   >> ${ENKFDIR}/run_gsi_mem.job
    echo '#SBATCH' "--mem-per-cpu=5G"                                       >> ${ENKFDIR}/run_gsi_mem.job
    echo '#SBATCH' "-n ${GSI_CORES}"                                            >> ${ENKFDIR}/run_gsi_mem.job
@@ -461,7 +483,7 @@ ${REMOVE} advModel.sed gsiparm.anl.head
    module load mkl/latest
    module load hmpt/2.27
 
-   source ${ENVFILE} 
+   source ${ENVFILE}
 
    #CREATE DIRECTORIES AND COPY IN REQUIRED FILES
    echo " Create working directory:" ${ENKFDIR}/gsi\${SLURM_ARRAY_TASK_ID}
@@ -472,21 +494,21 @@ ${REMOVE} advModel.sed gsiparm.anl.head
    cd ${ENKFDIR}/gsi\${SLURM_ARRAY_TASK_ID}
 
    #ln -sf ${RUNDIR}/GSI_RUN/gsi.exe .
-   ln -sf ${ENKFDIR}/wrfinput_d01.\${SLURM_ARRAY_TASK_ID} ./wrf_inout 
+   ln -sf ${ENKFDIR}/wrfinput_d01.\${SLURM_ARRAY_TASK_ID} ./wrf_inout
    /bin/cp -pv ${ENKFDIR}/gsiparm.anl ./gsiparm.anl
-   
+
    #observation files
    /bin/cp -pv ${ENKFDIR}/goes.nc ./goes.nc
    /bin/cp -pv ${ENKFDIR}/dbzobs.nc  ./dbzobs.nc
    /bin/cp -pv ${ENKFDIR}/vrobs.nc  ./vrobs.nc
    /bin/cp -pv ${ENKFDIR}/cwpobs.nc  ./cwpobs.nc
-   /bin/cp -pv ${ENKFDIR}/goes_amv.nc ./goes_amv.nc 
+   /bin/cp -pv ${ENKFDIR}/goes_amv.nc ./goes_amv.nc
    /bin/cp -pv ${ENKFDIR}/okmeso.mdf    ./okmeso.mdf
    /bin/cp -pv ${ENKFDIR}/prepbufr ./prepbufr
    /bin/cp -pv ${ENKFDIR}/dlbufr ./dlbufr
    /bin/cp -pv ${ENKFDIR}/aeribufr ./aeribufr
    /bin/cp -pv ${CENTRALDIR}/geoinfo.csv ./
-   
+
    #fixed files
    echo " Copy fixed files and link CRTM coefficient files to working directory"
    /bin/cp -pv $ANAVINFO ./anavinfo
@@ -507,21 +529,21 @@ ${REMOVE} advModel.sed gsiparm.anl.head
    ln -sf ${CRTM_DIR}/MWwaterLUT.bin .
    ln -sf ${CRTM_DIR}/Nalli.IRwater.EmisCoeff.bin .
    ln -sf ${CRTM_DIR}/WuSmith.IRwater.EmisCoeff.bin .
-   ln -sf ${CRTM_DIR}/abi* .   
+   ln -sf ${CRTM_DIR}/abi* .
 
    #/bin/cp -p ${GSIDIR}/util/Analysis_Utilities/read_diag/histo_adj_radiance.exe ./
    #/bin/cp -p ${GSIDIR}/util/Analysis_Utilities/read_diag/namelist.adj ./
 
-   sleep 2 
+   sleep 2
    srun --mpi=pmi2 ${RUNDIR}/GSI_RUN/gsi.exe > ${ENKFDIR}/run_gsi.mem\${SLURM_ARRAY_TASK_ID}_${datea}.log
    sleep 2
 
    if ( -e pe0001.conv_01) then
-      sleep 8 
+      sleep 8
       cat pe*conv_01* > ./diag_conv_ges.tmp
    endif
-   
-   if ( ${goesyes} == 1) then 
+
+   if ( ${goesyes} == 1) then
      cp ./bias_info ${RESULTSDIR}/stdout/bias_info.${datea}.\${SLURM_ARRAY_TASK_ID}
      cat pe*abi_g16_01* > ./diag_abi_g16_ges.temp
      #sleep 1
@@ -530,12 +552,12 @@ ${REMOVE} advModel.sed gsiparm.anl.head
 
    sleep 1
 
-   if (! -e pe0001.conv_01) then                                                                                                                                                                                                                                                        
-     touch gsi_failed\${SLURM_ARRAY_TASK_ID}                                                                                                                                                                                                                                            
-     exit 0                                                                                                                                                                                                                                                                             
-   endif     
+   if (! -e pe0001.conv_01) then
+     touch gsi_failed\${SLURM_ARRAY_TASK_ID}
+     exit 0
+   endif
 
-   touch gsi_done\${SLURM_ARRAY_TASK_ID}   
+   touch gsi_done\${SLURM_ARRAY_TASK_ID}
 
    exit 0
 
@@ -546,7 +568,7 @@ EOF
 
     set submit_time = `date +%s`
 
-    ## CHECK TO SEE IF ALL MEMBERS HAVE FINISHED 
+    ## CHECK TO SEE IF ALL MEMBERS HAVE FINISHED
     set imem = 1
     while ( ${imem} <= ${ENS_SIZE} )
     set mem=${imem}
@@ -555,8 +577,8 @@ EOF
     endif
     if ( ${imem} < 10 ) then
       set mem=00${imem}
-    endif   
-   
+    endif
+
     while ( ! -e  ${ENKFDIR}/gsi${imem}/gsi_done${imem} )
        echo "WAITING FOR GSI MEMBER "${imem}" TO FINISH"
        if ( -e ${ENKFDIR}/gsi${imem}/gsi_failed${imem} ) then
@@ -575,11 +597,11 @@ EOF
        sleep 3
     end
 
-    # MOVE Files  
+    # MOVE Files
     cat ${ENKFDIR}/gsi${imem}/pe*conv_01* > ${ENKFDIR}/diag_conv_ges.mem${mem}
-    if ( ${goesyes} == 1) then 
-        mv ${ENKFDIR}/gsi${imem}/diag_abi_g16_ges.temp ${ENKFDIR}/diag_abi_g16_ges.mem${mem} 
-	#mv ${ENKFDIR}/gsi${imem}/ADJ_CDF_WV.txt ${RESULTSDIR}/stdout/ADJ_CDF_WV.${datea}_${mem}.txt 
+    if ( ${goesyes} == 1) then
+        mv ${ENKFDIR}/gsi${imem}/diag_abi_g16_ges.temp ${ENKFDIR}/diag_abi_g16_ges.mem${mem}
+	#mv ${ENKFDIR}/gsi${imem}/ADJ_CDF_WV.txt ${RESULTSDIR}/stdout/ADJ_CDF_WV.${datea}_${mem}.txt
     endif
     @ imem++
    end
@@ -589,19 +611,19 @@ EOF
 
    # CALCULATE MEAN PRIOR INNOVATION FILE
    cd ${ENKFDIR}
-   ${COPY} ${SCRIPTDIR}/innov_mean_conv.exe ${ENKFDIR}/innov_mean_conv.exe
-   ${COPY} ${SCRIPTDIR}/innov_mean_radiance.exe ${ENKFDIR}/innov_mean_radiance.exe
+   ${COPY} ${execdir}/innov_mean_conv.exe ${ENKFDIR}/innov_mean_conv.exe
+   ${COPY} ${execdir}/innov_mean_radiance.exe ${ENKFDIR}/innov_mean_radiance.exe
    ${COPY} ${SCRIPTDIR}/run_diagmean.job ${ENKFDIR}/run_diagmean.job
    ${COPY} ${SCRIPTDIR}/run_diagmean_rad.job ${ENKFDIR}/run_diagmean_rad.job
-   
+
 ${REMOVE} advModel.sed namelist.innov
 cat >! advModel.sed << EOF
  /nmem/c\
  nmem  = ${ENS_SIZE},
 EOF
 
-# The EOF on the line above MUST REMAIN in column 1.   
-   sed -f advModel.sed ${TEMPLATE_DIR}/namelist.innov.template >! ${ENKFDIR}/namelist.innov  
+# The EOF on the line above MUST REMAIN in column 1.
+   sed -f advModel.sed ${TEMPLATE_DIR}/namelist.innov.template >! ${ENKFDIR}/namelist.innov
    sed -f advModel.sed ${TEMPLATE_DIR}/namelist.innov.rad.template.g16 >! ${ENKFDIR}/namelist.innov.rad
 
    #CONVENTIONAL
@@ -624,7 +646,7 @@ EOF
   ${REMOVE} ${ENKFDIR}/gsi*/*err
   ${REMOVE} ${ENKFDIR}/gsi*/*done*
 #  ${MOVE} ${ENKFDIR}/run_gsi.mem*log* ${RESULTSDIR}/stdout
-  #${MOVE} ${ENKFDIR}/run_histomatch.mem*log* ${RESULTSDIR}/stdout 
+  #${MOVE} ${ENKFDIR}/run_histomatch.mem*log* ${RESULTSDIR}/stdout
   ${REMOVE} ${ENKFDIR}/*log*
   ${REMOVE} ${ENKFDIR}/advModel.sed
 
@@ -655,13 +677,13 @@ EOF
 
      source ${ENVFILE}
      set echo
- 
-     srun --mpi=pmi2 ${RUNDIR}/GSI_RUN/wrf_enkf 
-     
+
+     srun --mpi=pmi2 ${RUNDIR}/GSI_RUN/wrf_enkf
+
      sleep 1
 
      if ( -e ${ENKFDIR}/allobs_enkf) then
-        touch ${ENKFDIR}/enkf_done   
+        touch ${ENKFDIR}/enkf_done
      endif
 
      exit 0
@@ -678,7 +700,7 @@ EOF
             echo "ENKF FAILED....RETRYING "${datea}
             rm -f ${ENKFDIR}/core
 	    #rm -f ${ENKFDIR}/enkf_done
-            sbatch ${ENKFDIR}/runenkf.job  
+            sbatch ${ENKFDIR}/runenkf.job
          endif
    end
 
@@ -723,7 +745,7 @@ EOF
 
      set imem = 1
      while ( ${imem} <= ${ENS_SIZE} )
-        while ( ! -e ${CENTRALDIR}/D02/FCST/${event}/analysis_${datea}_done )
+        while ( ! -e ${RUNDIR:h:h}/D02/FCST/${event}/analysis_${datea}_done )
          echo "WAITING FOR NEST DA TO FINISH"
          sleep 10
         end
@@ -744,30 +766,30 @@ EOF
      echo '#SBATCH' "-o ${RUNDIR}/adv_wrf_mem\%a.log"                            >> ${RUNDIR}/adv_wrf_mem.job
      echo '#SBATCH' "-e ${RUNDIR}/adv_wrf_mem\%a.err"                            >> ${RUNDIR}/adv_wrf_mem.job
      echo '#SBATCH' "-p batch"                                                   >> ${RUNDIR}/adv_wrf_mem.job
-     echo '#SBATCH' "--mem-per-cpu=5G"                                           >> ${RUNDIR}/adv_wrf_mem.job 
+     echo '#SBATCH' "--mem-per-cpu=5G"                                           >> ${RUNDIR}/adv_wrf_mem.job
      echo '#SBATCH' "-n ${WRF_CORES}"                                            >> ${RUNDIR}/adv_wrf_mem.job
-     echo '#SBATCH' "-t 1:00:00"                                                 >> ${RUNDIR}/adv_wrf_mem.job 
+     echo '#SBATCH' "-t 1:00:00"                                                 >> ${RUNDIR}/adv_wrf_mem.job
      echo "#=================================================================="  >> ${RUNDIR}/adv_wrf_mem.job
 
      cat >> ${RUNDIR}/adv_wrf_mem.job << EOF
-     
+
      source ${ENVFILE}
      set echo
 
      if ( -d "${RUNDIR}/enkfrun\${SLURM_ARRAY_TASK_ID}" ) then
       ${REMOVEDIR} ${RUNDIR}/enkfrun\${SLURM_ARRAY_TASK_ID}
      endif
-     
+
      mkdir ${RUNDIR}/enkfrun\${SLURM_ARRAY_TASK_ID}
-     cd ${RUNDIR}/enkfrun\${SLURM_ARRAY_TASK_ID} 
+     cd ${RUNDIR}/enkfrun\${SLURM_ARRAY_TASK_ID}
 
      ${SCRIPTDIR}/runwrf_conv.csh \${SLURM_ARRAY_TASK_ID} ${thisstart} ${thisend} ${ENVFILE}
      cp -f ${TEMPLATE_DIR}/input.nml.conv1 ./input.nml
      cp -f ${ADDNOISEDIR}/add_pert_where_high_refl.exe ./add_pert_where_high_refl.exe
      cp -f ${ENKFDIR}/refl_obs.txt ./refl_obs.txt
-     cp -f ${CENTRALDIR}/D02/${event}/enkfdir/refl_obs.txt ./refl_obs_1km.txt
+     cp -f ${RUNDIR:h:h}/D02/${event}/enkfdir/refl_obs.txt ./refl_obs_1km.txt
 
-     if ( ${noise_flag} == 1 ) then 
+     if ( ${noise_flag} == 1 ) then
         srun -n 1 add_pert_where_high_refl.exe refl_obs.txt wrfinput_d01 $lh $lv $u_sd $v_sd $w_sd $t_sd $td_sd $qv_sd ${iseed} ${iseed2} \${SLURM_ARRAY_TASK_ID}  > ./addnoise.output.\${SLURM_ARRAY_TASK_ID}
         srun -n 1 add_pert_where_high_refl.exe refl_obs_1km.txt wrfinput_d02 3000.0 $lv $u_sd $v_sd $w_sd $t_sd $td_sd $qv_sd ${iseed} ${iseed2} \${SLURM_ARRAY_TASK_ID}  > ./addnoise.output.d02.\${SLURM_ARRAY_TASK_ID}
      endif
@@ -775,7 +797,7 @@ EOF
      sleep 2
      srun -n 1 ${RUNDIR}/WRF_RUN/update_wrf_bc.exe > ./update_wrf_bc.output.\${SLURM_ARRAY_TASK_ID}
      sleep 2
-     
+
      srun ${RUNDIR}/WRF_RUN/wrf.exe
      sleep 2
 
@@ -784,15 +806,15 @@ EOF
       ${COPY} ${RUNDIR}/enkfrun\${SLURM_ARRAY_TASK_ID}/wrfout_d01_${endyear}-${endmonth}-${endday}_${endhour}:${endmin}:00 ${RUNDIR}/${thisstart}/wrffcst_d01_${endyear}-${endmonth}-${endday}_${endhour}:${endmin}:00_\${SLURM_ARRAY_TASK_ID}
       ${MOVE} ${RUNDIR}/enkfrun\${SLURM_ARRAY_TASK_ID}/wrfout_d01_${endyear}-${endmonth}-${endday}_${endhour}:${endmin}:00 ${ENKFDIR}/wrfinput_d01.\${SLURM_ARRAY_TASK_ID}
 
-      ${MOVE} ${RUNDIR}/enkfrun\${SLURM_ARRAY_TASK_ID}/wrfout_d02_${startyear}-${startmonth}-${startday}_${starthour}:${startmin}:00 ${CENTRALDIR}/D02/${event}/${thisstart}/wrfout_d02_${startyear}-${startmonth}-${startday}_${starthour}:${startmin}:00_\${SLURM_ARRAY_TASK_ID}
-      ${COPY} ${RUNDIR}/enkfrun\${SLURM_ARRAY_TASK_ID}/wrfout_d02_${endyear}-${endmonth}-${endday}_${endhour}:${endmin}:00 ${CENTRALDIR}/D02/${event}/${thisstart}/wrffcst_d02_${endyear}-${endmonth}-${endday}_${endhour}:${endmin}:00_\${SLURM_ARRAY_TASK_ID}
-      ${MOVE} ${RUNDIR}/enkfrun\${SLURM_ARRAY_TASK_ID}/wrfout_d02_${endyear}-${endmonth}-${endday}_${endhour}:${endmin}:00 ${CENTRALDIR}/D02/${event}/enkfdir/wrfinput_d02.\${SLURM_ARRAY_TASK_ID}
+      ${MOVE} ${RUNDIR}/enkfrun\${SLURM_ARRAY_TASK_ID}/wrfout_d02_${startyear}-${startmonth}-${startday}_${starthour}:${startmin}:00 ${RUNDIR:h:h}/D02/${event}/${thisstart}/wrfout_d02_${startyear}-${startmonth}-${startday}_${starthour}:${startmin}:00_\${SLURM_ARRAY_TASK_ID}
+      ${COPY} ${RUNDIR}/enkfrun\${SLURM_ARRAY_TASK_ID}/wrfout_d02_${endyear}-${endmonth}-${endday}_${endhour}:${endmin}:00 ${RUNDIR:h:h}/D02/${event}/${thisstart}/wrffcst_d02_${endyear}-${endmonth}-${endday}_${endhour}:${endmin}:00_\${SLURM_ARRAY_TASK_ID}
+      ${MOVE} ${RUNDIR}/enkfrun\${SLURM_ARRAY_TASK_ID}/wrfout_d02_${endyear}-${endmonth}-${endday}_${endhour}:${endmin}:00 ${RUNDIR:h:h}/D02/${event}/enkfdir/wrfinput_d02.\${SLURM_ARRAY_TASK_ID}
 
       ${COPY} ${RUNDIR}/enkfrun\${SLURM_ARRAY_TASK_ID}/rsl.error.0000  ${RUNDIR}/${thisstart}/rsl.error.0000_\${SLURM_ARRAY_TASK_ID}
 
       sleep 1
       touch ${RUNDIR}/adv_wrf_done\${SLURM_ARRAY_TASK_ID}
-     endif 
+     endif
 
      exit 0
 
