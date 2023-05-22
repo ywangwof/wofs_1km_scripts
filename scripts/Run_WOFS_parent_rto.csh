@@ -11,12 +11,13 @@ set scrptdir=$0:h
 set scrptdir=`realpath ${scrptdir}`
 set parentdir=${scrptdir:h}
 
-if ($#argv == 1 ) then
-    set realconfig = $argv[1]
+if ($#argv >= 1 ) then
+    set realconfig = `realpath $argv[1]`
 else
     set realconfig = ${parentdir}/WOFenv_rto_d01
 endif
 
+echo "Realtime configuration file: $realconfig"
 source ${realconfig}
 set execdir = ${SCRIPTDIR:h}/exec
 
@@ -24,20 +25,33 @@ set ENVFILE = ${TOP_DIR}/retro.cfg.${event}
 source ${ENVFILE}
 
 #set echo
+set nonomatch
+
 set startdate = ${event}${cycle_start}00
 #set datea = ${event}${cycle_start}00
-if ($#argv == 2 ) then
+if ($#argv >= 2 ) then
     if ($argv[2] =~ [0-9][0-9][0-9][0-9]) then
-        set starttime = ${argv[2]}
+        set starttime = "${argv[2]}"
     else
         echo "ERROR: unsupported argument: $argv[2]"
         exit 0
     endif
 else
-    set starttime = 1500
+    set starttime = "1500"
 endif
+if ($#argv == 3 ) then
+    if ($argv[3] =~ [0-9][0-9][0-9][0-9]) then
+        set endtime = "${argv[3]}"
+    else
+        echo "ERROR: unsupported argument: $argv[3]"
+        exit 0
+    endif
+else
+    set endtime = "0300"
+endif
+
 set datea = ${event}${starttime}
-set datef = ${nxtDay}0300
+set datef = ${nxtDay}${endtime}
 
 cd ${RUNDIR}
 
@@ -72,7 +86,7 @@ while (1 == 1)
   #set datep  =  `echo  ${datea} -${cycleinterval}m | ${RUNDIR}/advance_time`
   #echo $datep
   set daten  =  `echo  ${datea} ${cycleinterval}m | ${RUNDIR}/advance_time`
-  echo $daten
+  echo "Current DA cycle: $daten"
 
   set thisstart = ${datea}
   set thisend = ${daten}
@@ -116,8 +130,8 @@ while (1 == 1)
     ${COPY} ${SCRIPTDIR}/run_nceamean_conv_d01.job .
     sbatch run_nceamean_conv_d01.job
 
+    echo "WAITING FOR ENSEMBLE MEAN TO FINISH"
     while ( ! -e ${ENKFDIR}/ensmean_done01 )
-        echo "WAITING FOR ENSEMBLE MEAN TO FINISH"
         sleep 3
     end
     ${REMOVE} ${ENKFDIR}/ensmean_done01
@@ -229,8 +243,8 @@ EOF
 
     # SUBMIT INIT INFLATION
     sbatch runinitinf.job
+    echo "WAITING FOR INITIALIZING INFLATION TO FINISH"
     while ( ! -e ${ENKFDIR}/init_inf_done )
-        echo "WAITING FOR INITIALIZING INFLATION TO FINISH"
         sleep 5
     end
 
@@ -281,8 +295,8 @@ EOF
    # SUBMIT PRIOR INFLATION
    sbatch runpriorinf.job
 
+   echo "WAITING FOR PRIOR INFLATION TO FINISH"
    while ( ! -e ${ENKFDIR}/prior_inf_done )
-       echo "WAITING FOR PRIOR INFLATION TO FINISH"
        sleep 5
        if ( -e ${ENKFDIR}/core ) then
           ${MOVE} core ${RESULTSDIR}/stdout/core.priorinf.${thisstart}
@@ -328,15 +342,15 @@ EOF
        ${COPY} ${ADDNOISEDIR}/grid_refl_obs_gsi.exe ./
        ${COPY} ${SCRIPTDIR}/run_grid_refl.job ./
        if ( -e ${ENKFDIR}/grid_refl_obs_gsi.exe ) then##
-	  echo "ADDITIVE NOISE APPLIED"
+            echo "ADDITIVE NOISE APPLIED"
 ##           RUN NCL SCRIPT TO EXTRACT WHERE ADD-NOISE IS TO BE APPLIED#
-	  sbatch run_grid_refl.job
-	  while ( ! -e "refl_done" )
-	        echo "WAITING FOR NCL REFL TO FINISH"
-	        sleep 2
-	  end
-       else
-	  echo "NO GRID REFL FOUND: ADDITIVE NOISE NOT APPLIED"
+            sbatch run_grid_refl.job
+            echo "WAITING FOR NCL REFL TO FINISH, refl_done in $cwd"
+            while ( ! -e "refl_done" )
+                  sleep 2
+            end
+        else
+            echo "NO GRID REFL FOUND: ADDITIVE NOISE NOT APPLIED"
        endif
    endif
 
@@ -579,8 +593,8 @@ EOF
       set mem=00${imem}
     endif
 
+    echo "WAITING FOR GSI MEMBER "${imem}" TO FINISH"
     while ( ! -e  ${ENKFDIR}/gsi${imem}/gsi_done${imem} )
-       echo "WAITING FOR GSI MEMBER "${imem}" TO FINISH"
        if ( -e ${ENKFDIR}/gsi${imem}/gsi_failed${imem} ) then
                  rm ${ENKFDIR}/gsi${imem}/gsi_failed${imem}
                  echo "GSI FOR MEMBER "${imem}" FAILED...RESUBMITTING"
@@ -628,17 +642,17 @@ EOF
 
    #CONVENTIONAL
    sbatch run_diagmean.job
+   echo "WAITING FOR DIAG MEAN CONV TO FINISH"
    while ( ! -e ${ENKFDIR}/diagmean_done )
-     echo "WAITING FOR DIAG MEAN CONV TO FINISH"
-     sleep 2
+       sleep 2
    end
 
    #RADIANCES
    if ( -e  ${ENKFDIR}/diag_abi_g16_ges.mem001 ) then
      sbatch run_diagmean_rad.job
+     echo "WAITING FOR DIAG MEAN-RAD CONV TO FINISH"
      while ( ! -e ${ENKFDIR}/diagmeanrad_done )
-      echo "WAITING FOR DIAG MEAN-RAD CONV TO FINISH"
-      sleep 2
+         sleep 2
      end
    endif
 
@@ -693,13 +707,13 @@ EOF
    sbatch ${ENKFDIR}/runenkf.job
    sleep 1
 
+   echo "WAITING FOR ENKF TO FINISH"
    while ( ! -e ${ENKFDIR}/enkf_done )
-         echo "WAITING FOR ENKF TO FINISH"
          sleep 5
          if ( -e ${ENKFDIR}/core ) then
             echo "ENKF FAILED....RETRYING "${datea}
             rm -f ${ENKFDIR}/core
-	    #rm -f ${ENKFDIR}/enkf_done
+            #rm -f ${ENKFDIR}/enkf_done
             sbatch ${ENKFDIR}/runenkf.job
          endif
    end
@@ -744,10 +758,10 @@ EOF
 #### Wait for nest DA cycle to finish before advancing
 
      set imem = 1
+     echo "WAITING FOR NEST DA TO FINISH, ${RUNDIR:h:h}/D02/FCST/${event}/analysis_${datea}_done"
      while ( ${imem} <= ${ENS_SIZE} )
         while ( ! -e ${RUNDIR:h:h}/D02/FCST/${event}/analysis_${datea}_done )
-         echo "WAITING FOR NEST DA TO FINISH"
-         sleep 10
+            sleep 10
         end
 
        @ imem++
@@ -826,9 +840,9 @@ EOF
 ## CHECK TO SEE IF ALL MEMBERS HAVE FINISHED AND MOVE FILES AROUND
      set imem = 1
      while ( ${imem} <= ${ENS_SIZE} )
+        echo "WAITING FOR MEMBER "${imem}" TO FINISH"
         while ( ! -e ${RUNDIR}/adv_wrf_done${imem} )
-	 echo "WAITING FOR MEMBER "${imem}" TO FINISH"
-         sleep 3
+            sleep 3
         end
 
        ${REMOVE} enkfrun${imem}/rsl*
@@ -853,9 +867,9 @@ EOF
    ${COPY} ${SCRIPTDIR}/run_nceamean_conv_d01.job .
    sbatch run_nceamean_conv_d01.job
 
+   echo "WAITING FOR ENSEMBLE MEAN TO FINISH"
    while ( ! -e ${ENKFDIR}/ensmean_done01 )
-     echo "WAITING FOR ENSEMBLE MEAN TO FINISH"
-     sleep 3
+        sleep 3
    end
    ${REMOVE} ${ENKFDIR}/ensmean_done01
    ${REMOVE} ${ENKFDIR}/nceamean01.*
@@ -878,18 +892,19 @@ EOF
 
    # Advance to the next time if this is not the final time
     if ( $datea == $datef ) then
-	  echo "Script exiting normally"
-        # CLEAN UP AND MOVE FINAL THINGS
- 	  exit
+        echo "Script exiting normally"
+        break
      else
-	  echo "Starting next time"
-          set datea  =  `echo  ${datea} ${cycleinterval}m | ${RUNDIR}/advance_time`
+        set datea  =  `echo  ${datea} ${cycleinterval}m | ${RUNDIR}/advance_time`
+        echo "Starting next time => $datea"
+        echo " "
      endif
 
      #if ( $datea > 202004191700 ) then
-	     #	sleep 300
-	     #endif
+     #	sleep 300
+     #endif
 
 end	# END CYCLE WHILE LOOP
 
-##########################################################################################
+# CLEAN UP AND MOVE FINAL THINGS
+exit 0

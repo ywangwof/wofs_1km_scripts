@@ -22,12 +22,14 @@ if ($#argv == 2 ) then
     endif
 endif
 
+echo "Realtime configuration file: $realconfig"
 source ${realconfig}
 
 set ENVFILE = ${TOP_DIR}/retro.cfg.${event}
 source $ENVFILE
 source ${CENTRALDIR}/radar_files/radars.${event}.csh
 #set echo
+set nonomatch
 
 setenv pcp 5
 
@@ -85,9 +87,11 @@ if ( ${hhh} == 0) then
    setenv fcst_start ${nxtDay}${btime}
 endif
 
+echo "fcst_start = ${fcst_start}"
+
 ### WAIT TO SEE IF THIS ANALYSIS TIME IS COMPLETE
+echo "WAITING FOR ANALYSIS TO FINISH:" ${fcst_start}
 while ( ! -e ${FCST_DIR}/analysis_${fcst_start}_done || ! -e ${CENTRALDIR}/D02/FCST/${event}/analysis_${fcst_start}_done )
-      echo "WAITING FOR ANALYSIS TO FINISH:" ${fcst_start}
       sleep 30
 end
 sleep 10
@@ -286,30 +290,28 @@ sleep 10
 
 set member = 1
 while ($member <= ${FCST_SIZE})
-  if ( $member <= 9 ) then
-     cd ${FCSTHR_DIR}/ENS_MEM_0${member}
-  else
-     cd ${FCSTHR_DIR}/ENS_MEM_${member}
-  endif
-  set keep_trying = true
+    set memstr = `printf "%02d" $member`
+    #cd ${FCSTHR_DIR}/ENS_MEM_${memstr}
+    set memdir = "${FCSTHR_DIR}/ENS_MEM_${memstr}"
+    set keep_trying = true
 
-  while ($keep_trying == 'true')
+    while ($keep_trying == 'true')
 
-    set SUCCESS = `grep "wrf: SUCCESS COMPLETE WRF" rsl.out.0000 | cat | wc -l`
-    if ($SUCCESS == 1) then
+        if (-f $memdir/rsl.out.0000) then
+            grep -q "wrf: SUCCESS COMPLETE WRF" $memdir/rsl.out.0000
+            if ($status == 0) then
+                set keep_trying = false
+                break
+            endif
+        endif
 
-       set keep_trying = false
-       break
+        sleep 30
+    end
 
-    endif
-
-    sleep 30
-  end
-##
     echo "Done with Forecast for Ensemble Member ${member}"
 
     @ member++
-    cd ..
+    #cd ..
 end
 
 touch ${FCST_DIR}/fcst_${fcst_start}_done

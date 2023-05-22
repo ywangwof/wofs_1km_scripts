@@ -1,4 +1,4 @@
-setenv event 20220504
+setenv event 20220512
 
 setenv SCRIPTDIR  /scratch/ywang/wofs_1km/wofs_1km_scripts/scripts
 setenv CENTRALDIR  /scratch/wofs_1km
