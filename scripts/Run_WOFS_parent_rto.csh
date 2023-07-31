@@ -30,10 +30,13 @@ set nonomatch
 set startdate = ${event}${cycle_start}00
 #set datea = ${event}${cycle_start}00
 if ($#argv >= 2 ) then
-    if ($argv[2] =~ [0-9][0-9][0-9][0-9]) then
-        set starttime = "${argv[2]}"
+    set sdatestr=${argv[2]:r}
+    set sprogram=${argv[2]:e}
+
+    if (${sdatestr} =~ [0-9][0-9][0-9][0-9]) then
+        set starttime = "${sdatestr}"
     else
-        echo "ERROR: unsupported argument: $argv[2]"
+        echo "ERROR: unsupported argument: ${argv[2]}"
         exit 0
     endif
 else
@@ -43,7 +46,7 @@ if ($#argv == 3 ) then
     if ($argv[3] =~ [0-9][0-9][0-9][0-9]) then
         set endtime = "${argv[3]}"
     else
-        echo "ERROR: unsupported argument: $argv[3]"
+        echo "ERROR: unsupported argument: ${argv[3]}"
         exit 0
     endif
 else
@@ -86,7 +89,7 @@ while (1 == 1)
   #set datep  =  `echo  ${datea} -${cycleinterval}m | ${RUNDIR}/advance_time`
   #echo $datep
   set daten  =  `echo  ${datea} ${cycleinterval}m | ${RUNDIR}/advance_time`
-  echo "Current DA cycle: $daten"
+  echo "Current DA cycle: $datea -> $daten"
 
   set thisstart = ${datea}
   set thisend = ${daten}
@@ -102,6 +105,13 @@ while (1 == 1)
   set endday   = `echo ${thisend} | cut -c7-8`
   set endhour  = `echo ${thisend} | cut -c9-10`
   set endmin   = `echo ${thisend} | cut -c11-12`
+
+  if ($?sprogram) then
+  if ($sprogram != "") then
+    #echo $sprogram
+    goto $sprogram
+  endif
+  endif
 
   ${REMOVE} -rf ${ENKFDIR}/enkfrun*
   ${REMOVE} -rf ${ENKFDIR}/*_done*
@@ -227,9 +237,7 @@ EOF
 
      cat >> ${ENKFDIR}/runinitinf.job << EOF
 
-     module load compiler
-     module load mkl/latest
-     module load hmpt/2.27
+     source ${realconfig}
 
      source ${ENVFILE}
 
@@ -276,9 +284,7 @@ EOF
 
      cat >> ${ENKFDIR}/runpriorinf.job << EOF
 
-     module load compiler
-     module load mkl/latest
-     module load hmpt/2.27
+     source ${realconfig}
 
      source ${ENVFILE}
 
@@ -486,16 +492,14 @@ ${REMOVE} advModel.sed gsiparm.anl.head
    echo '#SBATCH' "-o ${ENKFDIR}/run_gsi\%a.log"                               >> ${ENKFDIR}/run_gsi_mem.job
    echo '#SBATCH' "-e ${ENKFDIR}/run_gsi\%a.err"                               >> ${ENKFDIR}/run_gsi_mem.job
    echo '#SBATCH' "-p batch"                                                   >> ${ENKFDIR}/run_gsi_mem.job
-   echo '#SBATCH' "--mem-per-cpu=5G"                                       >> ${ENKFDIR}/run_gsi_mem.job
+   echo '#SBATCH' "--mem-per-cpu=5G"                                           >> ${ENKFDIR}/run_gsi_mem.job
    echo '#SBATCH' "-n ${GSI_CORES}"                                            >> ${ENKFDIR}/run_gsi_mem.job
    echo '#SBATCH -t 0:20:00'                                                   >> ${ENKFDIR}/run_gsi_mem.job
    echo "#=================================================================="  >> ${ENKFDIR}/run_gsi_mem.job
 
    cat >> ${ENKFDIR}/run_gsi_mem.job << EOF
 
-   module load compiler
-   module load mkl/latest
-   module load hmpt/2.27
+   source ${realconfig}
 
    source ${ENVFILE}
 
@@ -596,10 +600,10 @@ EOF
     echo "WAITING FOR GSI MEMBER "${imem}" TO FINISH"
     while ( ! -e  ${ENKFDIR}/gsi${imem}/gsi_done${imem} )
        if ( -e ${ENKFDIR}/gsi${imem}/gsi_failed${imem} ) then
-                 rm ${ENKFDIR}/gsi${imem}/gsi_failed${imem}
-                 echo "GSI FOR MEMBER "${imem}" FAILED...RESUBMITTING"
-                 sbatch --array=${imem} run_gsi_mem.job
-                 set submit_time = `date +%s`
+            rm ${ENKFDIR}/gsi${imem}/gsi_failed${imem}
+            echo "GSI FOR MEMBER "${imem}" FAILED...RESUBMITTING"
+            sbatch --array=${imem} run_gsi_mem.job
+            set submit_time = `date +%s`
        endif
        set cur_time = `date +%s`
        @ wait_time = $cur_time - $submit_time
@@ -688,6 +692,8 @@ EOF
      echo "#=================================================================="  >> ${ENKFDIR}/runenkf.job
 
      cat >> ${ENKFDIR}/runenkf.job << EOF
+
+     source ${realconfig}
 
      source ${ENVFILE}
      set echo
@@ -787,17 +793,19 @@ EOF
 
      cat >> ${RUNDIR}/adv_wrf_mem.job << EOF
 
+     source ${realconfig}
+
      source ${ENVFILE}
      set echo
 
      if ( -d "${RUNDIR}/enkfrun\${SLURM_ARRAY_TASK_ID}" ) then
-      ${REMOVEDIR} ${RUNDIR}/enkfrun\${SLURM_ARRAY_TASK_ID}
+        ${REMOVEDIR} ${RUNDIR}/enkfrun\${SLURM_ARRAY_TASK_ID}
      endif
 
      mkdir ${RUNDIR}/enkfrun\${SLURM_ARRAY_TASK_ID}
      cd ${RUNDIR}/enkfrun\${SLURM_ARRAY_TASK_ID}
 
-     ${SCRIPTDIR}/runwrf_conv.csh \${SLURM_ARRAY_TASK_ID} ${thisstart} ${thisend} ${ENVFILE}
+     ${SCRIPTDIR}/runwrf_conv.csh \${SLURM_ARRAY_TASK_ID} ${thisstart} ${thisend} ${ENVFILE} ${realconfig}
      cp -f ${TEMPLATE_DIR}/input.nml.conv1 ./input.nml
      cp -f ${ADDNOISEDIR}/add_pert_where_high_refl.exe ./add_pert_where_high_refl.exe
      cp -f ${ENKFDIR}/refl_obs.txt ./refl_obs.txt
@@ -837,6 +845,8 @@ EOF
      #SUBMIT ALL MEMBERS AT ONCE
      sbatch --array=1-${ENS_SIZE} ${RUNDIR}/adv_wrf_mem.job
 
+    adv_model:
+    set sprogram = ""
 ## CHECK TO SEE IF ALL MEMBERS HAVE FINISHED AND MOVE FILES AROUND
      set imem = 1
      while ( ${imem} <= ${ENS_SIZE} )

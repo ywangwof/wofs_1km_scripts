@@ -8,7 +8,7 @@ set scrptdir=`realpath ${scrptdir}`
 set parentdir=${scrptdir:h}
 
 if ($#argv >= 1 ) then
-    set realconfig = $argv[1]
+    set realconfig = `realpath $argv[1]`
 else
     set realconfig = ${parentdir}/WOFenv_rto_d01
 endif
@@ -254,7 +254,8 @@ sleep 1
 
    cat >> ${FCSTHR_DIR}/WoFS_FCST.job << EOF
 
-   source /scratch/wofs_1km/wofs_1km_scripts/WOFenv_rto_d01
+   source ${realconfig}
+
    source ${TOP_DIR}/retro.cfg.${event}
    set echo
 

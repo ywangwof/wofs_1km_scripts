@@ -30,15 +30,19 @@ set startdate = ${event}${cycle_start}00
 #set datea = ${event}${cycle_start}00
 #set datea = ${event}1500
 if ($#argv >= 2 ) then
-    if ($argv[2] =~ [0-9][0-9][0-9][0-9]) then
-        set starttime = "${argv[2]}"
+    set sdatestr=${argv[2]:r}
+    set sprogram=${argv[2]:e}
+
+    if (${sdatestr} =~ [0-9][0-9][0-9][0-9]) then
+        set starttime = "${sdatestr}"
     else
-        echo "ERROR: unsupported argument: $argv[2]"
+        echo "ERROR: unsupported argument: ${argv[2]}"
         exit 0
     endif
 else
     set starttime = "1500"
 endif
+
 if ($#argv == 3 ) then
     if ($argv[3] =~ [0-9][0-9][0-9][0-9]) then
         set endtime = "${argv[2]}"
@@ -86,7 +90,7 @@ while (1 == 1)
   #set datep  =  `echo  ${datea} -${cycleinterval}m | ${RUNDIR}/advance_time`
   #echo $datep
   set daten  =  `echo  ${datea} ${cycleinterval}m | ${RUNDIR}/advance_time`
-  echo "Current DA cycle: $daten"
+  echo "Current DA cycle: $datea -> $daten"
 
   set thisstart = ${datea}
   set thisend = ${daten}
@@ -102,6 +106,13 @@ while (1 == 1)
   set endday   = `echo ${thisend} | cut -c7-8`
   set endhour  = `echo ${thisend} | cut -c9-10`
   set endmin   = `echo ${thisend} | cut -c11-12`
+
+  if ($?sprogram ) then
+  if ($sprogram != "") then
+    #echo $sprogram
+    goto $sprogram
+  endif
+  endif
 
   ${REMOVE} -rf ${ENKFDIR}/enkfrun*
   ${REMOVE} -rf ${ENKFDIR}/*_done*
@@ -229,9 +240,7 @@ EOF
 
      cat >> ${ENKFDIR}/runinitinf.job << EOF
 
-     module load compiler
-     module load mkl/latest
-     module load hmpt/2.27
+     source ${realconfig}
 
      source ${ENVFILE}
 
@@ -278,9 +287,7 @@ EOF
 
      cat >> ${ENKFDIR}/runpriorinf.job << EOF
 
-     module load compiler
-     module load mkl/latest
-     module load hmpt/2.27
+     source ${realconfig}
 
      source ${ENVFILE}
 
@@ -372,8 +379,8 @@ EOF
    endif
 
    # SEARCH FOR NEW CWP OBSERVATION FILES
-   if ( -e ${SAT_DIR}/CWP/${startyear}/${thisstart}_GOES${GOESV}_CWP_OBS.nc ) then
-      /bin/cp -pv  ${SAT_DIR}/CWP/${startyear}/${thisstart}_GOES${GOESV}_CWP_OBS.nc ${ENKFDIR}/cwpobs.nc
+   if ( -e ${SAT_DIR}/CWP/3KM/${startyear}/${thisstart}_GOES${GOESV}_CWP_OBS.nc ) then
+      /bin/cp -pv  ${SAT_DIR}/CWP/3KM/${startyear}/${thisstart}_GOES${GOESV}_CWP_OBS.nc ${ENKFDIR}/cwpobs.nc
       set cwpyes = 1
    endif
 
@@ -493,9 +500,7 @@ ${REMOVE} advModel.sed gsiparm.anl.head
 
    cat >> ${ENKFDIR}/run_gsi_mem.job << EOF
 
-   module load compiler
-   module load mkl/latest
-   module load hmpt/2.27
+   source ${realconfig}
 
    source ${ENVFILE}
 
@@ -757,17 +762,19 @@ EOF
 
 ###   Advance grid along with parent domain (separate script)
 
+    adv_model:
+    set sprogram = ""
 
 ## CHECK TO SEE IF ALL MEMBERS HAVE FINISHED BEFORE NEXT CYCLE
-     set imem = 1
-     while ( ${imem} <= ${ENS_SIZE} )
-	echo "WAITING FOR MEMBER "${imem}" TO FINISH"
-        while ( ! -e ${RUNDIR:h:h}/D01/${event}/adv_wrf_done${imem} )
-            sleep 10
-        end
+    set imem = 1
+    while ( ${imem} <= ${ENS_SIZE} )
+    echo "WAITING FOR MEMBER "${imem}" TO FINISH"
+       while ( ! -e ${RUNDIR:h:h}/D01/${event}/adv_wrf_done${imem} )
+           sleep 10
+       end
 
-        @ imem++
-     end
+       @ imem++
+    end
 
     # CLEAN UP THINGS
     ${MOVE} ${ENKFDIR}/refl_obs.txt ${ENKFDIR}/refl_obs_${thisstart}.txt
