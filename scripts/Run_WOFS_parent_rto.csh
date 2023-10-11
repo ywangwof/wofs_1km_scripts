@@ -343,21 +343,21 @@ EOF
     # SEARCH FOR REFLECTIVITY OBSERVATIONS and RUN GRID REFL OBS
     if ( -e ${REF_DIR}/${yyyymmdd}/obs_seq_RF_${yyyymmdd}_${hhmm}.nc ) then
        /bin/cp -pv ${REF_DIR}/${yyyymmdd}/obs_seq_RF_${yyyymmdd}_${hhmm}.nc ${ENKFDIR}/dbzobs.nc
-#       python ${ENKFDIR}/dbz_boundary.py
+       #python ${ENKFDIR}/dbz_boundary.py
        set reflyes = 1
-       ${COPY} ${ADDNOISEDIR}/grid_refl_obs_gsi.exe ./
-       ${COPY} ${SCRIPTDIR}/run_grid_refl.job ./
-       if ( -e ${ENKFDIR}/grid_refl_obs_gsi.exe ) then##
-            echo "ADDITIVE NOISE APPLIED"
-##           RUN NCL SCRIPT TO EXTRACT WHERE ADD-NOISE IS TO BE APPLIED#
-            sbatch run_grid_refl.job
-            echo "WAITING FOR NCL REFL TO FINISH, refl_done in $cwd"
-            while ( ! -e "refl_done" )
-                  sleep 2
-            end
-        else
-            echo "NO GRID REFL FOUND: ADDITIVE NOISE NOT APPLIED"
-       endif
+       #NOISE ${COPY} ${ADDNOISEDIR}/grid_refl_obs_gsi.exe ./
+       #NOISE ${COPY} ${SCRIPTDIR}/run_grid_refl.job ./
+       #NOISE if ( -e ${ENKFDIR}/grid_refl_obs_gsi.exe ) then##
+       #NOISE      echo "ADDITIVE NOISE APPLIED"
+       #NOISE      ## RUN NCL SCRIPT TO EXTRACT WHERE ADD-NOISE IS TO BE APPLIED#
+       #NOISE      sbatch run_grid_refl.job
+       #NOISE      echo "WAITING FOR NCL REFL TO FINISH, refl_done in $cwd"
+       #NOISE      while ( ! -e "refl_done" )
+       #NOISE            sleep 2
+       #NOISE      end
+       #NOISE  else
+       #NOISE      echo "NO GRID REFL FOUND: ADDITIVE NOISE NOT APPLIED"
+       #NOISE endif
    endif
 
    # SEARCH FOR RADIAL VELOCITY OBSERVATIONS
@@ -498,6 +498,13 @@ ${REMOVE} advModel.sed gsiparm.anl.head
    echo "#=================================================================="  >> ${ENKFDIR}/run_gsi_mem.job
 
    cat >> ${ENKFDIR}/run_gsi_mem.job << EOF
+
+module purge
+module load compiler/latest
+module load mkl/latest
+module load hpcx-mt-ompi-intel-classic
+
+setenv LD_LIBRARY_PATH ${LD_LIBRARY_PATH}:/scratch/software/intel/netcdf/lib:/scratch/software/intel/hdf5/lib:/scratch/software/intel/grib2/lib:/scratch/software/miniconda3/lib:/usr/lib64
 
    source ${realconfig}
 
@@ -693,6 +700,13 @@ EOF
 
      cat >> ${ENKFDIR}/runenkf.job << EOF
 
+module purge
+module load compiler/latest
+module load mkl/latest
+module load hpcx-mt-ompi-intel-classic
+
+setenv LD_LIBRARY_PATH ${LD_LIBRARY_PATH}:/scratch/software/intel/netcdf/lib:/scratch/software/intel/hdf5/lib:/scratch/software/intel/grib2/lib:/scratch/software/miniconda3/lib:/usr/lib64
+
      source ${realconfig}
 
      source ${ENVFILE}
@@ -772,13 +786,17 @@ EOF
 
        @ imem++
      end
+###### APPLY Multivariate_additive_inflation  ##########################
+
 
 ###### APPLY ADDITIVE NOISE AND ADVANCE ENSEMBLE MEMBERS
 # SET ADDITIVE NOISE FLAG TO FALSE FOR FIRST CYELE
-     set noise_flag = 1
-     if ( ${starthour}${startmin} == ${cycle_start}00 ) then
-        set noise_flag = 0
-     endif
+    if ( $reflyes == 1 ) then
+       set noise_flag = 1
+    endif
+    if ( ${starthour}${startmin} == ${cycle_start}00 ) then
+       set noise_flag = 0
+    endif
 
      echo "#\!/bin/csh"     	         	                                 >! ${RUNDIR}/adv_wrf_mem.job
      echo "#=================================================================="  >> ${RUNDIR}/adv_wrf_mem.job
@@ -788,10 +806,18 @@ EOF
      echo '#SBATCH' "-p batch"                                                   >> ${RUNDIR}/adv_wrf_mem.job
      echo '#SBATCH' "--mem-per-cpu=5G"                                           >> ${RUNDIR}/adv_wrf_mem.job
      echo '#SBATCH' "-n ${WRF_CORES}"                                            >> ${RUNDIR}/adv_wrf_mem.job
-     echo '#SBATCH' "-t 1:00:00"                                                 >> ${RUNDIR}/adv_wrf_mem.job
+     echo '#SBATCH' "-t 00:30:00"                                                >> ${RUNDIR}/adv_wrf_mem.job
+     echo '#SBATCH' "--exclusive"                                                >> ${RUNDIR}/adv_wrf_mem.job
      echo "#=================================================================="  >> ${RUNDIR}/adv_wrf_mem.job
 
      cat >> ${RUNDIR}/adv_wrf_mem.job << EOF
+
+module purge
+module load compiler/latest
+module load mkl/latest
+module load hpcx-mt-ompi-intel-classic
+
+setenv LD_LIBRARY_PATH ${LD_LIBRARY_PATH}:/scratch/software/intel/netcdf/lib:/scratch/software/intel/hdf5/lib:/scratch/software/intel/grib2/lib:/scratch/software/miniconda3/lib:/usr/lib64
 
      source ${realconfig}
 
@@ -807,13 +833,29 @@ EOF
 
      ${SCRIPTDIR}/runwrf_conv.csh \${SLURM_ARRAY_TASK_ID} ${thisstart} ${thisend} ${ENVFILE} ${realconfig}
      cp -f ${TEMPLATE_DIR}/input.nml.conv1 ./input.nml
-     cp -f ${ADDNOISEDIR}/add_pert_where_high_refl.exe ./add_pert_where_high_refl.exe
-     cp -f ${ENKFDIR}/refl_obs.txt ./refl_obs.txt
-     cp -f ${RUNDIR:h:h}/D02/${event}/enkfdir/refl_obs.txt ./refl_obs_1km.txt
+     #NOISE cp -f ${ADDNOISEDIR}/add_pert_where_high_refl.exe ./add_pert_where_high_refl.exe
+     #NOISE cp -f ${ENKFDIR}/refl_obs.txt ./refl_obs.txt
+     #NOISE cp -f ${RUNDIR:h:h}/D02/${event}/enkfdir/refl_obs.txt ./refl_obs_1km.txt
 
+     echo ""
+     echo "Running on \$SLURM_JOB_NODELIST"
+     echo ""
      if ( ${noise_flag} == 1 ) then
-        srun -n 1 add_pert_where_high_refl.exe refl_obs.txt wrfinput_d01 $lh $lv $u_sd $v_sd $w_sd $t_sd $td_sd $qv_sd ${iseed} ${iseed2} \${SLURM_ARRAY_TASK_ID}  > ./addnoise.output.\${SLURM_ARRAY_TASK_ID}
-        srun -n 1 add_pert_where_high_refl.exe refl_obs_1km.txt wrfinput_d02 3000.0 $lv $u_sd $v_sd $w_sd $t_sd $td_sd $qv_sd ${iseed} ${iseed2} \${SLURM_ARRAY_TASK_ID}  > ./addnoise.output.d02.\${SLURM_ARRAY_TASK_ID}
+        ${SCRIPTDIR}/add_noise.csh ${RUNDIR}/enkfrun\${SLURM_ARRAY_TASK_ID} 01 ${thisstart} "$lh"    "$lv" \${SLURM_ARRAY_TASK_ID} ${WRF_CORES}
+        set istatus = \$?
+        if ( \$istatus != 0 ) then
+            echo "ERROR: Script ${SCRIPTDIR}/add_noise.csh: status = \$istatus."
+            exit \$istatus
+        endif
+        ${SCRIPTDIR}/add_noise.csh ${RUNDIR}/enkfrun\${SLURM_ARRAY_TASK_ID} 02 ${thisstart} "3000.0" "$lv" \${SLURM_ARRAY_TASK_ID} ${WRF_CORES}
+        set istatus = \$?
+        if ( \$istatus != 0 ) then
+            echo "ERROR: Script ${SCRIPTDIR}/add_noise.csh: status = \$istatus."
+            exit \$istatus
+        endif
+
+     #NOISE    srun -n 1 add_pert_where_high_refl.exe refl_obs.txt wrfinput_d01 $lh $lv $u_sd $v_sd $w_sd $t_sd $td_sd $qv_sd ${iseed} ${iseed2} \${SLURM_ARRAY_TASK_ID}  > ./addnoise.output.\${SLURM_ARRAY_TASK_ID}
+     #NOISE    srun -n 1 add_pert_where_high_refl.exe refl_obs_1km.txt wrfinput_d02 3000.0 $lv $u_sd $v_sd $w_sd $t_sd $td_sd $qv_sd ${iseed} ${iseed2} \${SLURM_ARRAY_TASK_ID}  > ./addnoise.output.d02.\${SLURM_ARRAY_TASK_ID}
      endif
 
      sleep 2
@@ -861,7 +903,7 @@ EOF
      end
 
     # CLEAN UP THINGS
-    ${MOVE} ${ENKFDIR}/refl_obs.txt ${ENKFDIR}/refl_obs_${thisstart}.txt
+    #NOISE ${MOVE} ${ENKFDIR}/refl_obs.txt ${ENKFDIR}/refl_obs_${thisstart}.txt
 #    ${REMOVE} ${RUNDIR}/*done*
     ${REMOVE} ${RUNDIR}/start_mem_*
     ${REMOVE} ${RUNDIR}/*job

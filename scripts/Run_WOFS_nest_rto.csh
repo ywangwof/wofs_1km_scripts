@@ -500,6 +500,13 @@ ${REMOVE} advModel.sed gsiparm.anl.head
 
    cat >> ${ENKFDIR}/run_gsi_mem.job << EOF
 
+module purge
+module load compiler/latest
+module load mkl/latest
+module load hpcx-mt-ompi-intel-classic
+
+setenv LD_LIBRARY_PATH ${LD_LIBRARY_PATH}:/scratch/software/intel/netcdf/lib:/scratch/software/intel/hdf5/lib:/scratch/software/intel/grib2/lib:/scratch/software/miniconda3/lib:/usr/lib64
+
    source ${realconfig}
 
    source ${ENVFILE}
@@ -692,6 +699,13 @@ EOF
      echo "#=================================================================="  >> ${ENKFDIR}/runenkf.job
 
      cat >> ${ENKFDIR}/runenkf.job << EOF
+
+module purge
+module load compiler/latest
+module load mkl/latest
+module load hpcx-mt-ompi-intel-classic
+
+setenv LD_LIBRARY_PATH ${LD_LIBRARY_PATH}:/scratch/software/intel/netcdf/lib:/scratch/software/intel/hdf5/lib:/scratch/software/intel/grib2/lib:/scratch/software/miniconda3/lib:/usr/lib64
 
      source ${ENVFILE}
      set echo

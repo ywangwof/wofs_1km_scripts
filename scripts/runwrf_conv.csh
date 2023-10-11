@@ -19,7 +19,7 @@ set END_DAY   = `echo ${endtime} | cut -c7-8`
 set END_HOUR  = `echo ${endtime} | cut -c9-10`
 set END_MIN   = `echo ${endtime} | cut -c11-12`
 
-echo ${END_HOUR}
+echo "Frwd time = ${START_HOUR}:${START_MIN} --> ${END_HOUR}:${END_MIN}"
 
 set WRFRUNDIR=${RUNDIR}/enkfrun${mem}
 
